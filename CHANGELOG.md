@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.9.0 (13 October 2026)
+
+* Follow YouTube channels from more kinds of link: a handle on its own (`@name`), a video link (`watch?v=`, `youtu.be`, Shorts, live), and playlists (`playlist?list=`), as well as channel links and channel IDs.
+* README: new YouTube section explaining what you can paste and where feed addresses come from.
+
 ## 1.8.0 (13 October 2026)
 
 First public release.

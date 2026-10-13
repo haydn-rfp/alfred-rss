@@ -57,7 +57,7 @@ SHOW_FEED_NAME = os.environ.get("show_feed_name", "1") != "0"  # feed / channel 
 SHOW_SUMMARY = os.environ.get("show_summary", "1") != "0"      # start of the description under each title
 PLAY_IN_SPOTIFY = os.environ.get("spotify", "1") != "0"        # play Spotify-hosted episodes in the Spotify app
 MAX_ITEMS = 300
-USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.8"
+USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.9"
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 RDF_ITEM = "{http://purl.org/rss/1.0/}item"
@@ -644,6 +644,36 @@ def failures(feeds, failed):
 
 ADD_PREFIX = re.compile(r"^add\b\s*", re.I)
 YT_CHANNEL_ID = re.compile(r"^UC[\w-]{22}$")
+YT_HANDLE = re.compile(r"^@[\w.-]{3,30}$")
+YT_FEED = "https://www.youtube.com/feeds/videos.xml?"
+
+
+def youtube_feed(url):
+    """Feed address for YouTube inputs the page itself can't give us, or None to carry on as normal.
+
+    UC… channel id → channel feed · @handle → channel page · playlist link → playlist feed ·
+    video link (watch, youtu.be, shorts, live) → the uploading channel's feed.
+    """
+    if YT_CHANNEL_ID.match(url):
+        return YT_FEED + "channel_id=" + url
+    if YT_HANDLE.match(url):
+        return "https://www.youtube.com/" + url
+    if not re.search(r"(^|//|\.)(youtube\.com|youtu\.be)/", url):
+        return None
+    playlist = re.search(r"[?&]list=([\w-]+)", url)
+    if playlist and "/playlist" in url:
+        return YT_FEED + "playlist_id=" + playlist.group(1)
+    video = re.search(r"youtu\.be/([\w-]{11})|[?&]v=([\w-]{11})|/(?:shorts|live)/([\w-]{11})", url)
+    if video:
+        vid = next(g for g in video.groups() if g)
+        try:
+            page = fetch("https://www.youtube.com/watch?v=" + vid).decode("utf-8", errors="replace")
+        except Exception:
+            return None
+        channel = re.search(r'itemprop="channelId" content="(UC[\w-]{22})"|"channelId":"(UC[\w-]{22})"', page)
+        if channel:
+            return YT_FEED + "channel_id=" + next(g for g in channel.groups() if g)
+    return None
 LOOKS_LIKE_URL = re.compile(r"^(https?://)?[\w-]+(\.[\w-]+)*\.[a-z]{2,}(/\S*)?$", re.I)
 
 
@@ -651,7 +681,7 @@ def add_items(query):
     """Items for the 'add a feed' flow, or None if the query isn't about adding."""
     q = query.strip()
     url = ADD_PREFIX.sub("", q) if ADD_PREFIX.match(q) else (
-        q if LOOKS_LIKE_URL.match(q) or YT_CHANNEL_ID.match(q) else None)
+        q if LOOKS_LIKE_URL.match(q) or YT_CHANNEL_ID.match(q) or YT_HANDLE.match(q) else None)
     if url is None:
         return None
     if not url:
@@ -1134,10 +1164,9 @@ def cmd_add(url):
     if not url:
         print("No URL given")
         return
-    if YT_CHANNEL_ID.match(url):
-        url = "https://www.youtube.com/feeds/videos.xml?channel_id=" + url
-    elif not re.match(r"^https?://", url, re.I):
+    if not re.match(r"^https?://", url, re.I) and not YT_CHANNEL_ID.match(url) and not YT_HANDLE.match(url):
         url = "https://" + url
+    url = youtube_feed(url) or url
 
     feeds = load(FEEDS_FILE, {})
     try:

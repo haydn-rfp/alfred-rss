@@ -901,7 +901,23 @@ Choose **Add RSS feed**, or paste a link straight after the keyword: `rss https:
 
 ![Adding a feed](images/add.png)
 
-You don't need the feed's address. A website, a YouTube channel (`youtube.com/@name`) or a YouTube channel ID all work. For sites without an advertised feed, the workflow looks for an unlisted one, then the site's sitemap, then reads the headlines from the page.
+You don't need the feed's address: paste the website and the workflow finds its feed. For sites without an advertised feed, it looks for an unlisted one, then the site's sitemap, then reads the headlines from the page.
+
+### YouTube
+
+Every YouTube channel and playlist has a feed, but YouTube doesn't show its address. Paste any of these and the workflow works it out:
+
+| You paste | You follow |
+| --- | --- |
+| `@name` or `youtube.com/@name` | The channel |
+| `youtube.com/channel/UC…`, `/c/name` or `/user/name` | The channel |
+| A channel ID on its own, e.g. `UCIaH-gZIVC432YRjNVvnyCA` | The channel |
+| A video link: `youtube.com/watch?v=…`, `youtu.be/…` or `/shorts/…` | The channel that uploaded it |
+| A playlist link: `youtube.com/playlist?list=…` | That playlist |
+
+Items show the channel's profile picture and the start of each video's description. Adding the same channel a second way is spotted as a duplicate.
+
+The feed itself is `youtube.com/feeds/videos.xml?channel_id=` followed by the channel ID (or `?playlist_id=` for a playlist), which can also be pasted directly. A channel's ID is listed in its page's About section under **Share channel → Copy channel ID**.
 
 To remove a feed, choose **Unsubscribe from a feed**.
 
@@ -1237,7 +1253,7 @@ Your feeds, read history and categories are stored in the workflow's data folder
 		</dict>
 	</array>
 	<key>version</key>
-	<string>1.8.0</string>
+	<string>1.9.0</string>
 	<key>webaddress</key>
 	<string>https://github.com/haydn-rfp/alfred-rss</string>
 </dict>
