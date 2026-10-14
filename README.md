@@ -77,6 +77,8 @@ Episodes hosted on Spotify (including Spotify for Creators, formerly Anchor) pla
 
 ### Refreshing
 
+If a feed stops updating, a **⚠ feeds not updating** row stays at the top of the list until it recovers. Choose it to see which feeds, why, and when each last updated, or to check them all again. YouTube's feed service occasionally goes down for every channel; when it does, channels are read from their Videos page instead, so they keep working.
+
 Feeds are checked when you open the list, at the interval chosen in the Workflow's Configuration (Alfred Preferences → Workflows → Alfred RSS → Configure Workflow…). To check now, type `rss refresh`.
 
 ## Configuration

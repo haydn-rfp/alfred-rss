@@ -33,6 +33,7 @@ CACHE_DIR = os.environ.get("alfred_workflow_cache") or os.path.join(DATA_DIR, "c
 FEEDS_FILE = os.path.join(DATA_DIR, "feeds.json")
 READ_FILE = os.path.join(DATA_DIR, "read.json")
 SPOTIFY_FILE = os.path.join(DATA_DIR, "spotify.json")  # link -> Spotify episode id
+HEALTH_FILE = os.path.join(DATA_DIR, "health.json")  # url -> {"ok", "error", "since", "fallback"}
 CATEGORIES_FILE = os.path.join(DATA_DIR, "categories.json")  # slug -> {"name", "feeds": [urls]}
 ARCHIVE_FILE = os.path.join(DATA_DIR, "archive.json")
 LEGACY_CACHE_FILE = os.path.join(CACHE_DIR, "items.json")
@@ -57,7 +58,7 @@ SHOW_FEED_NAME = os.environ.get("show_feed_name", "1") != "0"  # feed / channel 
 SHOW_SUMMARY = os.environ.get("show_summary", "1") != "0"      # start of the description under each title
 PLAY_IN_SPOTIFY = os.environ.get("spotify", "1") != "0"        # play Spotify-hosted episodes in the Spotify app
 MAX_ITEMS = 300
-USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.9"
+USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.10"
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 RDF_ITEM = "{http://purl.org/rss/1.0/}item"
@@ -457,36 +458,105 @@ def parse_page(raw, page_url):
     return clean(collector.title).split(" | ")[0].split(" - ")[0], site_root(page_url), best
 
 
+# ---------- YouTube fallback ----------
+# YouTube's feed service regularly returns 404/500 for every channel for hours or days at a time.
+# When that happens, read the channel's Videos page instead (same video ids, so read marks still match).
+
+YT_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "mo": 2592000, "y": 31536000}
+YT_AGO = re.compile(r"(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|wks?|months?|mos?|years?|yrs?)\s+ago")
+
+
+def approx_date(text_ago):
+    """'3 days ago' / 'Streamed 2 hours ago' → a timestamp (approximate)."""
+    m = YT_AGO.search(text_ago or "")
+    if not m:
+        return 0
+    unit = m.group(2)
+    key = "mo" if unit.startswith("mo") else "m" if unit.startswith("mi") else unit[0]
+    return time.time() - int(m.group(1)) * YT_UNITS[key]
+
+
+def youtube_videos_page(channel_id):
+    """(title, site, items) from a channel's Videos page."""
+    site = "https://www.youtube.com/channel/" + channel_id
+    page = fetch(site + "/videos").decode("utf-8", errors="replace")
+    m = re.search(r"var ytInitialData = (\{.*?\});</script>", page, re.S)
+    if not m:
+        raise NotAFeed("YouTube's Videos page couldn't be read")
+    items = []
+
+    def walk(o):
+        if isinstance(o, dict):
+            if "lockupViewModel" in o:  # current page format
+                v = o["lockupViewModel"]
+                meta = v.get("metadata", {}).get("lockupMetadataViewModel", {})
+                rows = meta.get("metadata", {}).get("contentMetadataViewModel", {}).get("metadataRows", [])
+                parts = [p.get("text", {}).get("content", "") for r in rows for p in r.get("metadataParts", [])]
+                add(v.get("contentId"), meta.get("title", {}).get("content", ""), " ".join(parts))
+                return
+            if "videoRenderer" in o:  # older page format
+                v = o["videoRenderer"]
+                add(v.get("videoId"), "".join(r.get("text", "") for r in v.get("title", {}).get("runs", [])),
+                    v.get("publishedTimeText", {}).get("simpleText", ""))
+                return
+            for x in o.values():
+                walk(x)
+        elif isinstance(o, list):
+            for x in o:
+                walk(x)
+
+    def add(video_id, title, ago):
+        if video_id and title:
+            items.append({"id": "yt:video:" + video_id, "title": title, "summary": "", "approx": True,
+                          "link": "https://www.youtube.com/watch?v=" + video_id, "date": approx_date(ago)})
+
+    walk(json.loads(m.group(1)))
+    if not items:
+        raise NotAFeed("no videos found on the channel's Videos page")
+    name = re.search(r'<meta property="og:title" content="([^"]+)"', page)
+    return html.unescape(name.group(1)) if name else "", site, items
+
+
 def load_source(url, kind="rss", scope=""):
-    """Fetch and parse any kind of source. scope limits sitemap items to a path, e.g. /opinion/."""
+    """Fetch and parse any kind of source. scope limits sitemap items to a path, e.g. /opinion/.
+
+    Returns (title, site, items, note); note is "" normally, or says when a fallback was used.
+    """
+    channel = re.search(r"youtube\.com/feeds/videos\.xml\?channel_id=(UC[\w-]{22})", url)
+    if channel:
+        try:
+            return parse_feed(fetch(url), url) + ("",)
+        except Exception:
+            title, site, items = youtube_videos_page(channel.group(1))
+            return title, site, items, "YouTube's feed is down, so this channel is read from its Videos page"
     raw = fetch(url)
     if kind == "sitemap":
         title, site, items = parse_sitemap(raw, url)
     elif kind == "page":
         title, site, items = parse_page(raw, url)
     else:
-        return parse_feed(raw, url)
+        return parse_feed(raw, url) + ("",)
     if scope:
         items = [i for i in items if urlparse(i["link"]).path.startswith(scope)]
-    return title, site, items
+    return title, site, items, ""
 
 
 def refresh(feeds):
-    """Fetch the given feeds ({url: info}) concurrently. Returns {url: {"title", "site", "items"} or None}."""
+    """Fetch the given feeds ({url: info}) concurrently.
+
+    Returns {url: {"title", "site", "items", "note"}} for successes and {url: {"error": reason}} for failures.
+    """
     def one(entry):
         url, info = entry
         try:
-            title, site, items = load_source(url, info.get("kind", "rss"), info.get("scope", ""))
+            title, site, items, note = load_source(url, info.get("kind", "rss"), info.get("scope", ""))
             ensure_icon(url, site or url)
-            return url, (title, site, items)
-        except Exception:
-            return url, None
+            return url, {"title": title, "site": site, "items": items, "note": note}
+        except Exception as e:
+            return url, {"error": friendly_error(e)}
 
-    out = {}
     with ThreadPoolExecutor(max_workers=8) as pool:
-        for url, parsed in pool.map(one, list(feeds.items())):
-            out[url] = None if parsed is None else {"title": parsed[0], "site": parsed[1], "items": parsed[2]}
-    return out
+        return dict(pool.map(one, list(feeds.items())))
 
 
 # ---------- archive ----------
@@ -504,13 +574,19 @@ def load_archive():
 
 
 def merge(archive_feed, fresh_items):
-    """Merge freshly fetched items into a feed's archive (fresh copy wins), newest first."""
+    """Merge freshly fetched items into a feed's archive (fresh copy wins), newest first.
+
+    Returns the ids of items that weren't in the archive before.
+    """
     by_id = {i["id"]: i for i in archive_feed.get("items", [])}
+    new_ids = [i["id"] for i in fresh_items if i["id"] not in by_id]
     fresh_ids = []
     now = time.time()
     for index, item in enumerate(fresh_items):
+        old = by_id.get(item["id"])
+        if item.pop("approx", False) and old:
+            item = dict(old)  # fallback copy is rougher than what's archived (exact date, description)
         if not item["date"]:  # undated (page) items: date them when first seen, keeping page order
-            old = by_id.get(item["id"])
             item["date"] = old["date"] if old else now - index
         by_id[item["id"]] = item
         fresh_ids.append(item["id"])
@@ -519,21 +595,35 @@ def merge(archive_feed, fresh_items):
         items = items[:max(ARCHIVE_LIMIT, PER_FEED)]
     archive_feed["items"] = items
     archive_feed["current"] = fresh_ids  # ids present in the live feed right now
+    return new_ids
 
 
 def update(feeds, archive, urls):
     """Fetch the given feeds into the archive. Returns the urls that failed."""
     results = refresh({u: feeds[u] for u in urls})
     failed = []
+    health = load(HEALTH_FILE, {})
+    now = time.time()
     for url, res in results.items():
-        if res is None:
+        status = health.setdefault(url, {})
+        if "error" in res:
             failed.append(url)
+            status.setdefault("since", now)
+            status["error"], status["tried"] = res["error"], now
             continue
+        health[url] = {"ok": now, "tried": now, "fallback": res["note"]} if res["note"] else {"ok": now, "tried": now}
         feed = archive["feeds"].setdefault(url, {})
         feed["title"], feed["site"] = res["title"], res["site"]
-        merge(feed, res["items"])
+        newest_before = max((i["date"] for i in feed.get("items", [])), default=0)
+        dates = {i["id"]: i["date"] for i in res["items"]}
+        new_ids = merge(feed, res["items"])
+        if res["note"] and newest_before:
+            # A fallback source can list older items the feed never showed; file them away as read
+            # rather than flooding the unread list with weeks-old videos.
+            mark([(url, i) for i in new_ids if dates.get(i, 0) < newest_before])
         if res["title"] and feeds[url].get("title") != res["title"] and not feeds[url].get("custom"):
             feeds[url]["title"] = res["title"]
+    save(HEALTH_FILE, {u: v for u, v in health.items() if u in feeds})
     archive["feeds"] = {u: v for u, v in archive["feeds"].items() if u in feeds}
     archive["fetched"] = time.time()
     save(ARCHIVE_FILE, archive)
@@ -637,9 +727,20 @@ def matches(query, item):
     return all(w in hay for w in words)
 
 
-def failures(feeds, failed):
-    return [{"title": "Couldn't fetch " + (feeds[u].get("title") or u), "subtitle": u, "valid": False}
-            for u in failed]
+def health_rows(feeds, only=None):
+    """A single warning row when feeds aren't updating (it stays until they recover)."""
+    health = load(HEALTH_FILE, {})
+    urls = [u for u in feeds if only is None or u in only]
+    failing = [u for u in urls if health.get(u, {}).get("error")]
+    if not failing:
+        return []
+    offline = len(failing) == len(urls) and all(
+        "couldn't be found" in health[u]["error"] or "too long" in health[u]["error"] for u in failing)
+    if offline:
+        return [nav_item("⚠ Can't reach your feeds", "You may be offline · showing saved items · ↵ for details",
+                         "health")]
+    return [nav_item("⚠ %d feed%s not updating" % (len(failing), "" if len(failing) == 1 else "s"),
+                     ", ".join(feed_title(feeds, u) for u in failing)[:90] + " · ↵ for details", "health")]
 
 
 ADD_PREFIX = re.compile(r"^add\b\s*", re.I)
@@ -771,7 +872,7 @@ def render_main(query):
     elif not found:
         items.append({"title": "No matches", "subtitle": "Nothing in your feeds matches “%s”" % q,
                       "valid": False})
-    return items + found[:MAX_ITEMS] + failures(feeds, failed)
+    return health_rows(feeds) + items + found[:MAX_ITEMS] if browsing else items + found[:MAX_ITEMS]
 
 
 def item_rows(feeds, archive, q, browsing, only=None, category=None):
@@ -847,6 +948,27 @@ def render(screen, query="", category="", feed_url=""):
     if screen == "main" or (screen in ("category", "pick") and category not in cats):
         return render_main(query)
 
+    if screen == "health":
+        health = load(HEALTH_FILE, {})
+        items = [nav_item("← Back", "All unread items", "main"),
+                 act_item("Check all feeds now", "Fetch every feed again", "refresh")]
+        failing = sorted((u for u in feeds if health.get(u, {}).get("error")), key=lambda u: feed_title(feeds, u).lower())
+        for url in failing:
+            h = health[url]
+            last = ("last updated " + ago(h["ok"])) if h.get("ok") else "never updated"
+            items.append({"title": feed_title(feeds, url), "icon": feed_icon(url), "arg": url,
+                          "subtitle": "%s · failing since %s · %s · ↵ open the feed address" % (
+                              h["error"][0].upper() + h["error"][1:], ago(h["since"]).replace(" ago", " ago"), last),
+                          "variables": {"step": "act", "action": "openurl"}})
+        for url in sorted((u for u in feeds if health.get(u, {}).get("fallback")), key=lambda u: feed_title(feeds, u).lower()):
+            items.append({"title": feed_title(feeds, url), "icon": feed_icon(url), "valid": False,
+                          "subtitle": "Working · " + health[url]["fallback"]})
+        if not failing:
+            items.append({"title": "All feeds are updating", "valid": False, "icon": {"path": "icon.png"}})
+        ok = len(feeds) - len(failing)
+        items.append({"title": "%d of %d feeds are fine" % (ok, len(feeds)), "valid": False, "icon": {"path": "icon.png"}})
+        return items
+
     if screen == "categories":
         archive = load_archive()
         items = [nav_item("← Back", "All unread items", "main"),
@@ -892,7 +1014,7 @@ def render(screen, query="", category="", feed_url=""):
                               "subtitle": "Type to search everything in this category", "valid": False})
         elif not found:
             items.append({"title": "No matches in %s" % cat["name"], "valid": False})
-        return items + found[:MAX_ITEMS] + failures(feeds, [u for u in failed if u in only])
+        return (health_rows(feeds, only) if not q else []) + items + found[:MAX_ITEMS]
 
     if screen == "pick":
         cat = cats[category]
@@ -1047,6 +1169,13 @@ def cmd_act(link):
         cmd_add(link)
     elif action == "unsubscribe":
         cmd_unsubscribe(feed_url or link)
+    elif action == "refresh":
+        feeds = load(FEEDS_FILE, {})
+        failed = update(feeds, load_archive(), list(feeds))
+        print("All %d feeds updated" % len(feeds) if not failed else "%d of %d feeds couldn't be updated" % (len(failed), len(feeds)))
+        go("health")
+    elif action == "openurl":
+        subprocess.run(["open", link])
     elif action == "nav":  # a screen chosen deeper than the chain goes: continue via the external trigger
         go(os.environ.get("screen", "main"), os.environ.get("category", ""), feed_url)
     elif action == "newcategory":
@@ -1118,6 +1247,11 @@ def find_source(url):
         if "Could not resolve host" in str(e):
             raise
 
+    # 0. YouTube feeds (also reached when the feed service is down)
+    if re.search(r"youtube\.com/feeds/videos\.xml\?channel_id=", url):
+        title, site, items, note = load_source(url)
+        return url, "rss", "", title, site, items, ("— " + note) if note else ""
+
     # 1. It is a feed, or the page advertises one
     if raw is not None:
         try:
@@ -1126,8 +1260,8 @@ def find_source(url):
         except (ET.ParseError, NotAFeed):
             found = discover_feed(raw.decode("utf-8", errors="replace"), url)
             if found:
-                title, site, items = parse_feed(fetch(found), found)
-                return found, "rss", "", title, site, items, ""
+                title, site, items, note = load_source(found)
+                return found, "rss", "", title, site, items, ("— " + note) if note else ""
 
     # 2. An unadvertised feed at a common address
     probed = probe_feeds(url)

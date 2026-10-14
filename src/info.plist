@@ -943,6 +943,8 @@ Episodes hosted on Spotify (including Spotify for Creators, formerly Anchor) pla
 
 ### Refreshing
 
+If a feed stops updating, a **⚠ feeds not updating** row stays at the top of the list until it recovers. Choose it to see which feeds, why, and when each last updated, or to check them all again. YouTube's feed service occasionally goes down for every channel; when it does, channels are read from their Videos page instead, so they keep working.
+
 Feeds are checked when you open the list, at the interval chosen in the [Workflow's Configuration](alfredpreferences:workflows&gt;workflow&gt;uk.co.rosefpsolutions.rssreader&gt;userconfig). To check now, type `rss refresh`.
 
 ## Configuration
@@ -1253,7 +1255,7 @@ Your feeds, read history and categories are stored in the workflow's data folder
 		</dict>
 	</array>
 	<key>version</key>
-	<string>1.9.0</string>
+	<string>1.10.0</string>
 	<key>webaddress</key>
 	<string>https://github.com/haydn-rfp/alfred-rss</string>
 </dict>

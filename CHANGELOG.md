@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.0 (14 October 2026)
+
+* Feeds that stop updating now stay flagged: a **⚠ feeds not updating** row remains at the top of the list until they recover, instead of appearing once and vanishing. Choose it to see each failing feed, the reason, when it last updated, and to check all feeds again. If every feed fails at once, it says you may be offline.
+* YouTube fallback: when YouTube's feed service is down (it periodically returns 404 for every channel), channels are read from their Videos page instead. Older videos that only appear on that page are added to search as read, so they don't flood the unread list.
+* Fixed: adding a YouTube channel during an outage now works.
+
 ## 1.9.0 (13 October 2026)
 
 * Follow YouTube channels from more kinds of link: a handle on its own (`@name`), a video link (`watch?v=`, `youtu.be`, Shorts, live), and playlists (`playlist?list=`), as well as channel links and channel IDs.
