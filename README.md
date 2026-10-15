@@ -75,6 +75,11 @@ Jump straight to a category by typing `rss #` followed by its name, e.g. `rss #f
 
 ### Podcasts
 
+Choose **Search podcasts** to find a show by name. Results come from Apple's podcast directory, with artwork, author and episode count, and ✓ marks shows you already follow. Press <kbd>↩</kbd> to subscribe.
+
+You can also paste a show's page: BBC programme links (BBC Sounds, `bbc.co.uk/programmes/…`, `bbc.com/audio/series/…`) and Apple Podcasts links are turned into the show's feed. Spotify doesn't share feeds, so find Spotify shows with **Search podcasts** instead.
+
+
 Install the free [Alfred RSS Player](https://github.com/haydn-rfp/alfred-rss-player) and turn on **Play in Alfred RSS Player** in the Workflow's Configuration to play podcasts and YouTube videos in a small floating player in the menu bar. Items it can play show ▶ in their subtitle:
 
 * <kbd>↩</kbd> Play in Alfred RSS Player and mark as read.

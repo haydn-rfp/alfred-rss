@@ -991,6 +991,11 @@ Jump straight to a category by typing `rss #` followed by its name, e.g. `rss #f
 
 ### Podcasts
 
+Choose **Search podcasts** to find a show by name. Results come from Apple's podcast directory, with artwork, author and episode count, and ✓ marks shows you already follow. Press &lt;kbd&gt;↩&lt;/kbd&gt; to subscribe.
+
+You can also paste a show's page: BBC programme links (BBC Sounds, `bbc.co.uk/programmes/…`, `bbc.com/audio/series/…`) and Apple Podcasts links are turned into the show's feed. Spotify doesn't share feeds, so find Spotify shows with **Search podcasts** instead.
+
+
 Install the free [Alfred RSS Player](https://github.com/haydn-rfp/alfred-rss-player) and turn on **Play in Alfred RSS Player** in the [Workflow's Configuration](alfredpreferences:workflows&gt;workflow&gt;uk.co.rosefpsolutions.rssreader&gt;userconfig) to play podcasts and YouTube videos in a small floating player in the menu bar. Items it can play show ▶ in their subtitle:
 
 * &lt;kbd&gt;↩&lt;/kbd&gt; Play in Alfred RSS Player and mark as read.
@@ -1351,7 +1356,7 @@ Your feeds, read history and categories are stored in the workflow's data folder
 		</dict>
 	</array>
 	<key>version</key>
-	<string>1.12.0</string>
+	<string>1.13.0</string>
 	<key>webaddress</key>
 	<string>https://github.com/haydn-rfp/alfred-rss</string>
 </dict>

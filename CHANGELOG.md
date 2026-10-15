@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.0 (15 October 2026)
+
+* **Search podcasts:** a new option on the main list. Type a show's name to search Apple's podcast directory, with artwork, author, episode count and ✓ for shows you follow; ↩ subscribes. Every result uses the show's real feed, so episodes play in Alfred RSS Player.
+* Adding a BBC programme link (BBC Sounds, `bbc.co.uk/programmes/…`, `bbc.com/audio/series/…`) or an Apple Podcasts link now subscribes to the show's feed instead of failing or opening the browser.
+* Spotify show links explain that Spotify doesn't share feeds and point you to Search podcasts.
+
 ## 1.12.0 (15 October 2026)
 
 * Adding a feed now plays a sound: a soft chime when it's added, and a low tone when it can't be (no feed found, an error, or already subscribed). Turn it off with the new **Sounds** setting in the Workflow's Configuration.

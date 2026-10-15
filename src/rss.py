@@ -62,7 +62,7 @@ ALFRED_PLAYER = os.environ.get("alfred_player") == "1"         # ↵ plays podca
 PLAYER_APPS = ("~/Applications/Alfred RSS Player.app", "/Applications/Alfred RSS Player.app")
 PLAYER_URL = "https://github.com/haydn-rfp/alfred-rss-player"
 MAX_ITEMS = 300
-USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.12"
+USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.13"
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 RDF_ITEM = "{http://purl.org/rss/1.0/}item"
@@ -773,6 +773,30 @@ YT_HANDLE = re.compile(r"^@[\w.-]{3,30}$")
 YT_FEED = "https://www.youtube.com/feeds/videos.xml?"
 
 
+def podcast_feed(url):
+    """Real RSS feed for podcast pages that don't link one, or None to carry on as normal.
+
+    BBC programme pages (bbc.co.uk/sounds/brand/…, /programmes/…, bbc.com/audio/series/…) and
+    Apple Podcasts links (…/id123) are converted; Spotify shows can't be, so they raise a helpful error.
+    """
+    bbc = re.search(r"bbc\.(?:co\.uk|com)/(?:sounds/brand|programmes|audio/series)/([a-z0-9]{8})", url)
+    if bbc:
+        return "https://podcasts.files.bbci.co.uk/%s.rss" % bbc.group(1)
+    apple = re.search(r"podcasts\.apple\.com/.*?/id(\d+)", url)
+    if apple:
+        try:
+            found = json.loads(fetch("https://itunes.apple.com/lookup?entity=podcast&id=" + apple.group(1)))
+        except Exception:
+            raise NotAFeed("Apple Podcasts couldn't be reached — try again, or use “Search podcasts”")
+        feed = (found.get("results") or [{}])[0].get("feedUrl")
+        if not feed:
+            raise NotAFeed("Apple Podcasts doesn't list a feed for that show — try “Search podcasts”")
+        return feed
+    if re.search(r"open\.spotify\.com/(show|episode)/", url):
+        raise NotAFeed("Spotify doesn't share podcast feeds — use “Search podcasts” to find this show by name")
+    return None
+
+
 def youtube_feed(url):
     """Feed address for YouTube inputs the page itself can't give us, or None to carry on as normal.
 
@@ -885,6 +909,8 @@ def render_main(query):
         else:
             items.append({"title": "All caught up", "subtitle": "No unread items · type to search everything",
                           "valid": False, "icon": {"path": "icon.png"}})
+        items.append(nav_item("Search podcasts", "Find a show and subscribe; its episodes play in the player",
+                              "podsearch"))
         cats = load(CATEGORIES_FILE, {})
         items.append(nav_item("View categories",
                               ("%d categories" % len(cats)) if cats else "Group your feeds, e.g. News, Football, Podcasts",
@@ -971,6 +997,9 @@ def render(screen, query="", category="", feed_url=""):
 
     if screen == "main" or (screen in ("category", "pick") and category not in cats):
         return render_main(query)
+
+    if screen == "podsearch":
+        return render_podcast_search(q, feeds)
 
     if screen == "health":
         health = load(HEALTH_FILE, {})
@@ -1070,6 +1099,91 @@ def render(screen, query="", category="", feed_url=""):
         return items
 
     return render_main(query)
+
+
+# ---------- podcast search ----------
+# Apple's public podcast directory (no account or key needed). Every result carries the show's real
+# RSS feed, so episodes have audio files Alfred RSS Player can play.
+
+SEARCH_CACHE = os.path.join(CACHE_DIR, "podcast-search.json")
+ART_DIR = os.path.join(CACHE_DIR, "podcast-art")
+
+
+def store_country():
+    """Apple store country from the Mac's region (e.g. en_GB → GB), so results suit the user."""
+    try:
+        locale = subprocess.run(["defaults", "read", "-g", "AppleLocale"], capture_output=True, text=True).stdout
+        m = re.search(r"_([A-Z]{2})", locale)
+        return m.group(1) if m else "US"
+    except Exception:
+        return "US"
+
+
+def search_podcasts(query):
+    cache = load(SEARCH_CACHE, {})
+    key = query.lower()
+    if key in cache and time.time() - cache[key]["t"] < 3600:
+        return cache[key]["results"]
+    url = "https://itunes.apple.com/search?media=podcast&entity=podcast&limit=12&country=%s&term=%s" % (
+        store_country(), quote(query))
+    results = [{"name": r.get("collectionName", ""), "author": r.get("artistName", ""),
+                "feed": r.get("feedUrl", ""), "episodes": r.get("trackCount") or 0,
+                "genre": r.get("primaryGenreName", ""), "art": r.get("artworkUrl100", ""),
+                "page": r.get("collectionViewUrl", "")}
+               for r in json.loads(fetch(url)).get("results", []) if r.get("feedUrl")]
+    cache = {k: v for k, v in cache.items() if time.time() - v["t"] < 3600}
+    cache[key] = {"t": time.time(), "results": results}
+    save(SEARCH_CACHE, cache)
+    return results
+
+
+def podcast_art(result):
+    """Local copy of a search result's artwork (Alfred icons must be files)."""
+    if not result["art"]:
+        return None
+    path = os.path.join(ART_DIR, hashlib.md5(result["art"].encode()).hexdigest() + ".jpg")
+    if not os.path.exists(path):
+        try:
+            os.makedirs(ART_DIR, exist_ok=True)
+            data = fetch(result["art"])
+            with open(path, "wb") as f:
+                f.write(data)
+        except Exception:
+            return None
+    return path
+
+
+def same_feed(a, b):
+    norm = lambda u: re.sub(r"^https?://(www\.)?", "", u or "").rstrip("/").lower()
+    return norm(a) == norm(b)
+
+
+def render_podcast_search(q, feeds):
+    items = [nav_item("← Back", "All unread items", "main")]
+    if len(q) < 2:
+        items.insert(0, {"title": "Search podcasts", "subtitle": "Type a show's name, e.g. Football Daily",
+                         "valid": False, "icon": {"path": "icon.png"}})
+        return items
+    try:
+        results = search_podcasts(q)
+    except Exception as e:
+        return [{"title": "Couldn't search podcasts", "subtitle": friendly_error(e), "valid": False}] + items
+    if not results:
+        return [{"title": "No podcasts found for “%s”" % q, "valid": False}] + items
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        art = list(pool.map(podcast_art, results))
+    found = []
+    for result, icon in zip(results, art):
+        followed = any(same_feed(result["feed"], u) for u in feeds)
+        details = " · ".join(x for x in (result["author"], "%d episodes" % result["episodes"] if result["episodes"] else "",
+                                         result["genre"]) if x)
+        item = act_item(result["name"], ("✓ Following · " if followed else "↵ Subscribe · ") + details,
+                        "add", arg=result["feed"], icon={"path": icon} if icon else None)
+        if followed:
+            item["valid"] = False
+        item["quicklookurl"] = result["page"]
+        found.append(item)
+    return found + items
 
 
 def cmd_nav(query):
@@ -1368,7 +1482,11 @@ def cmd_add(url):
         return False
     if not re.match(r"^https?://", url, re.I) and not YT_CHANNEL_ID.match(url) and not YT_HANDLE.match(url):
         url = "https://" + url
-    url = youtube_feed(url) or url
+    try:
+        url = youtube_feed(url) or podcast_feed(url) or url
+    except NotAFeed as e:
+        print("Couldn't add %s: %s" % (url, e))
+        return False
 
     feeds = load(FEEDS_FILE, {})
     try:
