@@ -53,6 +53,8 @@ Items show the channel's profile picture and the start of each video's descripti
 
 The feed itself is `youtube.com/feeds/videos.xml?channel_id=` followed by the channel ID (or `?playlist_id=` for a playlist), which can also be pasted directly. A channel's ID is listed in its page's About section under **Share channel → Copy channel ID**.
 
+A soft chime plays when a feed is added, and a low tone when it can't be (you can turn these off).
+
 To remove a feed, choose **Unsubscribe from a feed**.
 
 ### Categories
@@ -91,6 +93,7 @@ Feeds are checked when you open the list, at the interval chosen in the Workflow
 * **Keyword:** the keyword that opens the reader.
 * **Subtitle:** show the feed name and the start of each item's description under its title.
 * **Podcasts:** play podcasts and YouTube in [Alfred RSS Player](https://github.com/haydn-rfp/alfred-rss-player), and play Spotify-hosted episodes in the Spotify app.
+* **Sounds:** a chime when a feed is added, and a low tone when it can't be.
 * **History per feed:** how many past items each feed keeps for searching. Each item is about 0.7 KB.
 * **Unread per feed:** how many of a feed's newest items can appear as unread, so large back catalogues don't flood the list.
 * **Check for new items:** how often feeds are fetched.

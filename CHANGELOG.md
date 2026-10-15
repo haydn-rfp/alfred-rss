@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.0 (15 October 2026)
+
+* Adding a feed now plays a sound: a soft chime when it's added, and a low tone when it can't be (no feed found, an error, or already subscribed). Turn it off with the new **Sounds** setting in the Workflow's Configuration.
+
 ## 1.11.0 (15 October 2026)
 
 * New setting, **Play podcasts and YouTube in Alfred RSS Player** (Podcasts, in the Workflow's Configuration, off by default). With the free [Alfred RSS Player](https://github.com/haydn-rfp/alfred-rss-player) installed, ↩ plays podcast episodes and YouTube videos in a small floating player in the menu bar, and <kbd>⇧</kbd><kbd>⌘</kbd><kbd>↩</kbd> opens them in the browser instead. Items it can play show ▶.

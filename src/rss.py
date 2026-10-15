@@ -57,11 +57,12 @@ CACHE_TTL = setting("refresh_minutes", 15) * 60  # seconds before feeds are fetc
 SHOW_FEED_NAME = os.environ.get("show_feed_name", "1") != "0"  # feed / channel name under each title
 SHOW_SUMMARY = os.environ.get("show_summary", "1") != "0"      # start of the description under each title
 PLAY_IN_SPOTIFY = os.environ.get("spotify", "1") != "0"        # play Spotify-hosted episodes in the Spotify app
+SOUNDS = os.environ.get("sounds", "1") != "0"                  # chime when a feed is added, low tone when it can't be
 ALFRED_PLAYER = os.environ.get("alfred_player") == "1"         # ↵ plays podcasts / YouTube in Alfred RSS Player
 PLAYER_APPS = ("~/Applications/Alfred RSS Player.app", "/Applications/Alfred RSS Player.app")
 PLAYER_URL = "https://github.com/haydn-rfp/alfred-rss-player"
 MAX_ITEMS = 300
-USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.11"
+USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.12"
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 RDF_ITEM = "{http://purl.org/rss/1.0/}item"
@@ -1224,7 +1225,7 @@ def cmd_act(link):
         mark([(url, i) for url, feed in archive["feeds"].items() for i in unread_window(feed)])
         print("Marked all as read")
     elif action == "add":
-        cmd_add(link)
+        play_sound("Glass" if cmd_add(link) else "Basso")
     elif action == "unsubscribe":
         cmd_unsubscribe(feed_url or link)
     elif action == "refresh":
@@ -1277,6 +1278,14 @@ NEXT = {}
 def go(screen, category="", feed_url=""):
     """After an action, show this screen again (the Run Script's output routes to the 'nav' external trigger)."""
     NEXT.update(nav_vars(screen, category, feed_url))
+
+
+def play_sound(name):
+    """Play a macOS alert sound quietly in the background (doesn't hold up Alfred)."""
+    path = "/System/Library/Sounds/%s.aiff" % name
+    if SOUNDS and os.path.exists(path):
+        subprocess.Popen(["afplay", "-v", "0.5", path], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
 
 
 def friendly_error(e):
@@ -1352,10 +1361,11 @@ def find_source(url):
 
 
 def cmd_add(url):
+    """Subscribe to a URL. Returns True if a feed was added."""
     url = url.strip()
     if not url:
         print("No URL given")
-        return
+        return False
     if not re.match(r"^https?://", url, re.I) and not YT_CHANNEL_ID.match(url) and not YT_HANDLE.match(url):
         url = "https://" + url
     url = youtube_feed(url) or url
@@ -1365,14 +1375,14 @@ def cmd_add(url):
         source, kind, scope, title, site, items, note = find_source(url)
     except NotAFeed:
         print("No RSS feed, sitemap or article list found at " + url)
-        return
+        return False
     except Exception as e:
         print("Couldn't add %s: %s" % (url, friendly_error(e)))
-        return
+        return False
 
     if source in feeds and feeds[source].get("scope", "") == scope:
         print("Already subscribed to " + (feeds[source].get("title") or source))
-        return
+        return False
 
     feeds[source] = {"title": title or source, "added": time.time()}
     if kind != "rss":
@@ -1388,6 +1398,7 @@ def cmd_add(url):
     merge(feed, items)
     save(ARCHIVE_FILE, archive)
     print("Added %s%s (%d items)" % (title or source, " " + note if note else "", len(items)))
+    return True
 
 
 def cmd_unsubscribe(url):
