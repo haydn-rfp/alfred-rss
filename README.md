@@ -73,7 +73,12 @@ Jump straight to a category by typing `rss #` followed by its name, e.g. `rss #f
 
 ### Podcasts
 
-Episodes hosted on Spotify (including Spotify for Creators, formerly Anchor) play in the Spotify app. Other episodes open their audio in your browser. The first time, macOS asks to let Alfred control Spotify.
+Install the free [Alfred RSS Player](https://github.com/haydn-rfp/alfred-rss-player) and turn on **Play in Alfred RSS Player** in the Workflow's Configuration to play podcasts and YouTube videos in a small floating player in the menu bar. Items it can play show ▶ in their subtitle:
+
+* <kbd>↩</kbd> Play in Alfred RSS Player and mark as read.
+* <kbd>⇧</kbd><kbd>⌘</kbd><kbd>↩</kbd> Open in the browser instead.
+
+Otherwise, episodes hosted on Spotify (including Spotify for Creators, formerly Anchor) play in the Spotify app, and other episodes open their audio in your browser. The first time, macOS asks to let Alfred control Spotify.
 
 ### Refreshing
 
@@ -85,7 +90,7 @@ Feeds are checked when you open the list, at the interval chosen in the Workflow
 
 * **Keyword:** the keyword that opens the reader.
 * **Subtitle:** show the feed name and the start of each item's description under its title.
-* **Podcasts:** play Spotify-hosted episodes in the Spotify app.
+* **Podcasts:** play podcasts and YouTube in [Alfred RSS Player](https://github.com/haydn-rfp/alfred-rss-player), and play Spotify-hosted episodes in the Spotify app.
 * **History per feed:** how many past items each feed keeps for searching. Each item is about 0.7 KB.
 * **Unread per feed:** how many of a feed's newest items can appear as unread, so large back catalogues don't flood the list.
 * **Check for new items:** how often feeds are fetched.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.0 (15 October 2026)
+
+* New setting, **Play podcasts and YouTube in Alfred RSS Player** (Podcasts, in the Workflow's Configuration, off by default). With the free [Alfred RSS Player](https://github.com/haydn-rfp/alfred-rss-player) installed, ↩ plays podcast episodes and YouTube videos in a small floating player in the menu bar, and <kbd>⇧</kbd><kbd>⌘</kbd><kbd>↩</kbd> opens them in the browser instead. Items it can play show ▶.
+* Podcast episodes now keep their audio file address, so feeds that link to a web page (or to Spotify) can still be played.
+* If the setting is on but the player isn't installed, items open normally and a notification says where to get it.
+
 ## 1.10.0 (14 October 2026)
 
 * Feeds that stop updating now stay flagged: a **⚠ feeds not updating** row remains at the top of the list until they recover, instead of appearing once and vanishing. Choose it to see each failing feed, the reason, when it last updated, and to check all feeds again. If every feed fails at once, it says you may be offline.

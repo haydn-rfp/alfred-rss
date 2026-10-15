@@ -113,6 +113,16 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>D9FBC1B3-61AC-4D13-BEF9-3BD39FC16916</string>
+				<key>modifiers</key>
+				<integer>1179648</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>66832B4B-C1C8-46A7-816B-9C4B249D1946</key>
 		<array>
@@ -156,6 +166,16 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>F8BEAB81-A8A2-44C4-89DA-1AC0418FC600</string>
+				<key>modifiers</key>
+				<integer>1179648</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>C2DCC2E5-183D-4209-B201-4D1501E1880C</key>
 		<array>
@@ -194,6 +214,16 @@
 				<string>CBD30E0D-E739-493F-BD8D-B09C0908CC48</string>
 				<key>modifiers</key>
 				<integer>262144</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>CBD30E0D-E739-493F-BD8D-B09C0908CC48</string>
+				<key>modifiers</key>
+				<integer>1179648</integer>
 				<key>modifiersubtext</key>
 				<string></string>
 				<key>vitoclose</key>
@@ -262,6 +292,16 @@
 				<string>C3963ECB-6941-4953-8990-1E8E4E4FD69C</string>
 				<key>modifiers</key>
 				<integer>262144</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>C3963ECB-6941-4953-8990-1E8E4E4FD69C</string>
+				<key>modifiers</key>
+				<integer>1179648</integer>
 				<key>modifiersubtext</key>
 				<string></string>
 				<key>vitoclose</key>
@@ -355,6 +395,16 @@
 				<string>497246B6-7FAE-4401-91A0-E8BAD9FBE607</string>
 				<key>modifiers</key>
 				<integer>262144</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>497246B6-7FAE-4401-91A0-E8BAD9FBE607</string>
+				<key>modifiers</key>
+				<integer>1179648</integer>
 				<key>modifiersubtext</key>
 				<string></string>
 				<key>vitoclose</key>
@@ -939,7 +989,12 @@ Jump straight to a category by typing `rss #` followed by its name, e.g. `rss #f
 
 ### Podcasts
 
-Episodes hosted on Spotify (including Spotify for Creators, formerly Anchor) play in the Spotify app. Other episodes open their audio in your browser. The first time, macOS asks to let Alfred control Spotify.
+Install the free [Alfred RSS Player](https://github.com/haydn-rfp/alfred-rss-player) and turn on **Play in Alfred RSS Player** in the [Workflow's Configuration](alfredpreferences:workflows&gt;workflow&gt;uk.co.rosefpsolutions.rssreader&gt;userconfig) to play podcasts and YouTube videos in a small floating player in the menu bar. Items it can play show ▶ in their subtitle:
+
+* &lt;kbd&gt;↩&lt;/kbd&gt; Play in Alfred RSS Player and mark as read.
+* &lt;kbd&gt;⇧&lt;/kbd&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;↩&lt;/kbd&gt; Open in the browser instead.
+
+Otherwise, episodes hosted on Spotify (including Spotify for Creators, formerly Anchor) play in the Spotify app, and other episodes open their audio in your browser. The first time, macOS asks to let Alfred control Spotify.
 
 ### Refreshing
 
@@ -951,7 +1006,7 @@ Feeds are checked when you open the list, at the interval chosen in the [Workflo
 
 * **Keyword:** the keyword that opens the reader.
 * **Subtitle:** show the feed name and the start of each item's description under its title.
-* **Podcasts:** play Spotify-hosted episodes in the Spotify app.
+* **Podcasts:** play podcasts and YouTube in [Alfred RSS Player](https://github.com/haydn-rfp/alfred-rss-player), and play Spotify-hosted episodes in the Spotify app.
 * **History per feed:** how many past items each feed keeps for searching. Each item is about 0.7 KB.
 * **Unread per feed:** how many of a feed's newest items can appear as unread, so large back catalogues don't flood the list.
 * **Check for new items:** how often feeds are fetched.
@@ -1136,6 +1191,25 @@ Your feeds, read history and categories are stored in the workflow's data folder
 			<key>config</key>
 			<dict>
 				<key>default</key>
+				<false/>
+				<key>required</key>
+				<false/>
+				<key>text</key>
+				<string>Play podcasts and YouTube in Alfred RSS Player</string>
+			</dict>
+			<key>description</key>
+			<string>Needs the free Alfred RSS Player app: github.com/haydn-rfp/alfred-rss-player. ⇧⌘↩ opens in the browser instead.</string>
+			<key>label</key>
+			<string>Podcasts</string>
+			<key>type</key>
+			<string>checkbox</string>
+			<key>variable</key>
+			<string>alfred_player</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
 				<true/>
 				<key>required</key>
 				<false/>
@@ -1145,7 +1219,7 @@ Your feeds, read history and categories are stored in the workflow's data folder
 			<key>description</key>
 			<string>Otherwise ↩ opens episodes in your browser.</string>
 			<key>label</key>
-			<string>Podcasts</string>
+			<string></string>
 			<key>type</key>
 			<string>checkbox</string>
 			<key>variable</key>
@@ -1255,7 +1329,7 @@ Your feeds, read history and categories are stored in the workflow's data folder
 		</dict>
 	</array>
 	<key>version</key>
-	<string>1.10.0</string>
+	<string>1.11.0</string>
 	<key>webaddress</key>
 	<string>https://github.com/haydn-rfp/alfred-rss</string>
 </dict>

@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse
 
 DATA_DIR = os.environ.get("alfred_workflow_data") or os.path.expanduser(
     "~/Library/Application Support/Alfred/Workflow Data/uk.co.rosefpsolutions.rssreader"
@@ -57,8 +57,11 @@ CACHE_TTL = setting("refresh_minutes", 15) * 60  # seconds before feeds are fetc
 SHOW_FEED_NAME = os.environ.get("show_feed_name", "1") != "0"  # feed / channel name under each title
 SHOW_SUMMARY = os.environ.get("show_summary", "1") != "0"      # start of the description under each title
 PLAY_IN_SPOTIFY = os.environ.get("spotify", "1") != "0"        # play Spotify-hosted episodes in the Spotify app
+ALFRED_PLAYER = os.environ.get("alfred_player") == "1"         # ↵ plays podcasts / YouTube in Alfred RSS Player
+PLAYER_APPS = ("~/Applications/Alfred RSS Player.app", "/Applications/Alfred RSS Player.app")
+PLAYER_URL = "https://github.com/haydn-rfp/alfred-rss-player"
 MAX_ITEMS = 300
-USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.10"
+USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.11"
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 RDF_ITEM = "{http://purl.org/rss/1.0/}item"
@@ -140,6 +143,18 @@ def summary_of(entry):
     return ""
 
 
+AUDIO_EXT = re.compile(r"\.(mp3|m4a|aac|ogg|opus|wav)(\?|$)", re.I)
+
+
+def audio_of(entry):
+    """The item's audio file (podcast enclosure), or ''."""
+    enclosure = entry.find("enclosure")
+    if enclosure is not None and enclosure.get("url"):
+        if (enclosure.get("type") or "").startswith("audio") or AUDIO_EXT.search(enclosure.get("url")):
+            return enclosure.get("url")
+    return ""
+
+
 def item_link(entry):
     """Best web link for an RSS item: <link> text, <link href>, a URL guid, then the enclosure (podcasts)."""
     for l in list(entry.findall("link")) + list(entry.findall(ATOM + "link")) + \
@@ -216,6 +231,7 @@ def _parse_feed(raw, feed_url):
             "link": urljoin(feed_url, link),
             "date": parse_date(text(entry, "pubDate", DC_DATE)),
             "summary": summary_of(entry),
+            "audio": audio_of(entry),
         })
     return clean(title), urljoin(feed_url, site), items
 
@@ -684,6 +700,11 @@ def alfred_item(item, url, name, is_read, category=None):
         meta = "✓ " + meta
     icon = icon_path(url)
     ids = {"item_id": item["id"], "feed_url": url, "step": "act"}
+    playable = playable_url(item) if ALFRED_PLAYER else ""
+    if playable:
+        meta = "▶ " + meta
+        ids.update(play_url=playable, play_title=item["title"], play_artist=name,
+                   play_artwork=icon if os.path.exists(icon) and not is_youtube(playable) else "")
     return {
         "uid": item["id"],
         "title": item["title"],
@@ -692,8 +713,10 @@ def alfred_item(item, url, name, is_read, category=None):
         "icon": {"path": icon} if os.path.exists(icon) else {"path": "icon.png"},
         "match": "%s %s %s" % (item["title"], name, summary),
         "quicklookurl": item["link"],
-        "variables": dict(ids, action="open"),
+        "variables": dict(ids, action="play" if playable else "open"),
         "mods": {
+            **({"cmd+shift": {"subtitle": "Open in the browser instead", "arg": item["link"],
+                              "variables": dict(ids, action="open")}} if playable else {}),
             "cmd": {"subtitle": "Mark as read without opening", "arg": item["link"],
                     "variables": dict(ids, action="markread")},
             "alt": {"subtitle": "Mark everything from %s as read" % name, "arg": item["link"],
@@ -1138,6 +1161,39 @@ def open_link(link):
     subprocess.run(["open", link])
 
 
+YOUTUBE_VIDEO = re.compile(r"(youtube\.com/(watch\?|shorts/|live/)|youtu\.be/)")
+
+
+def is_youtube(link):
+    return bool(YOUTUBE_VIDEO.search(link or ""))
+
+
+def player_installed():
+    return any(os.path.exists(os.path.expanduser(p)) for p in PLAYER_APPS)
+
+
+def playable_url(item):
+    """What Alfred Player can play for an item: its audio file or YouTube video, else ''."""
+    if item.get("audio"):
+        return item["audio"]
+    link = item.get("link", "")
+    if AUDIO_EXT.search(link) or is_youtube(link):
+        return link
+    return ""
+
+
+def play_in_player(env, link):
+    """Hand the item to Alfred RSS Player, or open it normally if the player isn't installed."""
+    if not player_installed():
+        open_link(link)
+        print("Alfred RSS Player isn't installed, so this opened normally. Get it at " + PLAYER_URL)
+        return
+    query = "&".join("%s=%s" % (k, quote(env.get("play_" + k, ""), safe=""))
+                     for k in ("url", "title", "artist", "artwork"))
+    query += "&id=" + quote(env.get("item_id", ""), safe="")
+    subprocess.run(["open", "-g", "alfredplayer://play?" + query])
+
+
 def mark(pairs):
     """Mark (feed_url, item_id) pairs as read."""
     read = load(READ_FILE, {})
@@ -1153,9 +1209,11 @@ def cmd_act(link):
     item_id, feed_url = os.environ.get("item_id", ""), os.environ.get("feed_url", "")
     archive = load_archive()
 
-    if action in ("open", "markread"):
+    if action in ("open", "markread", "play"):
         mark([(feed_url, item_id)])
-        if action == "open":
+        if action == "play":
+            play_in_player(os.environ, link)
+        elif action == "open":
             open_link(link)
     elif action == "markfeed":
         feed = archive["feeds"].get(feed_url, {})
