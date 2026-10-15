@@ -62,7 +62,7 @@ ALFRED_PLAYER = os.environ.get("alfred_player") == "1"         # ↵ plays podca
 PLAYER_APPS = ("~/Applications/Alfred RSS Player.app", "/Applications/Alfred RSS Player.app")
 PLAYER_URL = "https://github.com/haydn-rfp/alfred-rss-player"
 MAX_ITEMS = 300
-USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.13"
+USER_AGENT = "Mozilla/5.0 (Macintosh) AlfredRSS/1.13.1"
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 RDF_ITEM = "{http://purl.org/rss/1.0/}item"
@@ -1126,11 +1126,17 @@ def search_podcasts(query):
         return cache[key]["results"]
     url = "https://itunes.apple.com/search?media=podcast&entity=podcast&limit=12&country=%s&term=%s" % (
         store_country(), quote(query))
-    results = [{"name": r.get("collectionName", ""), "author": r.get("artistName", ""),
-                "feed": r.get("feedUrl", ""), "episodes": r.get("trackCount") or 0,
-                "genre": r.get("primaryGenreName", ""), "art": r.get("artworkUrl100", ""),
-                "page": r.get("collectionViewUrl", "")}
-               for r in json.loads(fetch(url)).get("results", []) if r.get("feedUrl")]
+    results, seen = [], set()
+    for r in json.loads(fetch(url)).get("results", []):
+        # Apple sometimes lists the same show twice (same name and author, different feed address)
+        show = (r.get("collectionName", "").strip().lower(), r.get("artistName", "").strip().lower())
+        if not r.get("feedUrl") or show in seen:
+            continue
+        seen.add(show)
+        results.append({"name": r.get("collectionName", ""), "author": r.get("artistName", ""),
+                        "feed": r.get("feedUrl", ""), "episodes": r.get("trackCount") or 0,
+                        "genre": r.get("primaryGenreName", ""), "art": r.get("artworkUrl100", ""),
+                        "page": r.get("collectionViewUrl", "")})
     cache = {k: v for k, v in cache.items() if time.time() - v["t"] < 3600}
     cache[key] = {"t": time.time(), "results": results}
     save(SEARCH_CACHE, cache)

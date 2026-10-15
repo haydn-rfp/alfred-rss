@@ -1356,7 +1356,7 @@ Your feeds, read history and categories are stored in the workflow's data folder
 		</dict>
 	</array>
 	<key>version</key>
-	<string>1.13.0</string>
+	<string>1.13.1</string>
 	<key>webaddress</key>
 	<string>https://github.com/haydn-rfp/alfred-rss</string>
 </dict>

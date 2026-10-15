@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.1 (15 October 2026)
+
+* Search podcasts no longer shows the same show twice when Apple's directory lists it more than once. Different shows that share a name are still shown, with their authors to tell them apart.
+
 ## 1.13.0 (15 October 2026)
 
 * **Search podcasts:** a new option on the main list. Type a show's name to search Apple's podcast directory, with artwork, author, episode count and ✓ for shows you follow; ↩ subscribes. Every result uses the show's real feed, so episodes play in Alfred RSS Player.
